@@ -1,17 +1,12 @@
 import React from 'react'
-import { CCol, CRow, CListGroup, CListGroupItem, CCallout, CSpinner } from '@coreui/react'
+import { CCol, CRow, CCallout, CSpinner } from '@coreui/react'
 import { Field, FormSpy } from 'react-final-form'
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome'
-import { faCheck, faExclamationTriangle, faTimes } from '@fortawesome/free-solid-svg-icons'
+import { faExclamationTriangle } from '@fortawesome/free-solid-svg-icons'
 import { CippWizard } from 'src/components/layout'
 import { WizardTableField } from 'src/components/tables'
 import PropTypes from 'prop-types'
-import {
-  RFFCFormInput,
-  RFFCFormRadio,
-  RFFCFormSelect,
-  RFFCFormTextarea,
-} from 'src/components/forms'
+import { RFFCFormSelect, RFFCFormTextarea } from 'src/components/forms'
 import { useLazyGenericGetRequestQuery, useLazyGenericPostRequestQuery } from 'src/store/api/app'
 import { OnChange } from 'react-final-form-listeners'
 
@@ -44,7 +39,7 @@ const AddPolicy = () => {
       (tenant) => (values[`Select_${tenant.defaultDomainName}`] = tenant.defaultDomainName),
     )
     values.TemplateType = values.Type
-    genericPostRequest({ path: '/api/AddPolicy', values: values })
+    genericPostRequest({ path: '/api/AddCAPolicy', values: values })
   }
   /* eslint-disable react/prop-types */
   const WhenFieldChanges = ({ field, set }) => (
@@ -61,7 +56,7 @@ const AddPolicy = () => {
                   return obj.GUID === value
                 })
                 // console.log(template[0][set])
-                onChange(template[0][set])
+                onChange(JSON.stringify(template[0]))
               }}
             </OnChange>
           )}
@@ -92,7 +87,7 @@ const AddPolicy = () => {
         <Field name="selectedTenants" validate={requiredArray}>
           {(props) => (
             <WizardTableField
-              reportName="Add-MEM-Policy-Tenant-Selector"
+              reportName="Add-CA-Policy-Tenant-Selector"
               keyField="defaultDomainName"
               path="/api/ListTenants?AllTenantSelector=true"
               columns={[
@@ -120,22 +115,20 @@ const AddPolicy = () => {
         <center>
           <h3 className="text-primary">Step 2</h3>
           <h5 className="card-title mb-4">
-            Enter the raw JSON for this policy. See{' '}
-            <a href="https://cipp.app/EndpointManagement/IntunePolicyTemplates">this</a>
-            for more information.
+            Enter the raw JSON for this policy, or select from a template. You can create templates
+            from existing policies.
           </h5>
         </center>
         <hr className="my-4" />
         <CRow>
           <CCol md={12}>
-            {intuneTemplates.isUninitialized &&
-              intuneGetRequest({ path: 'api/ListIntuneTemplates' })}
+            {intuneTemplates.isUninitialized && intuneGetRequest({ path: 'api/ListCATemplates' })}
             {intuneTemplates.isSuccess && (
               <RFFCFormSelect
                 name="TemplateList"
                 values={intuneTemplates.data?.map((template) => ({
                   value: template.GUID,
-                  label: template.Displayname,
+                  label: template.displayName,
                 }))}
                 placeholder="Select a template"
                 label="Please choose a template to apply, or enter the information manually."
@@ -145,69 +138,17 @@ const AddPolicy = () => {
         </CRow>
         <CRow>
           <CCol>
-            <RFFCFormSelect
-              name="Type"
-              label="Select Policy Type"
-              placeholder="Select a template type"
-              values={[
-                { label: 'Administrative Template', value: 'Admin' },
-                { label: 'Settings Catalog', value: 'Catalog' },
-                { label: 'Custom Configuration', value: 'Device' },
-              ]}
-            />
-          </CCol>
-        </CRow>
-        <CRow>
-          <CCol md={12}>
-            <RFFCFormInput
-              type="text"
-              name="Displayname"
-              label="Policy Display Name"
-              placeholder="Enter a name"
-            />
-          </CCol>
-        </CRow>
-        <CRow>
-          <CCol md={12}>
-            <RFFCFormInput
-              type="text"
-              name="Description"
-              label="Description"
-              placeholder="leave blank for none"
-            />
-          </CCol>
-        </CRow>
-        <CRow>
-          <CCol md={12}>
             <RFFCFormTextarea
-              type="text"
-              name="RAWJson"
-              label="Raw JSON"
-              placeholder="Enter RAW JSON information"
+              name="rawjson"
+              label="Conditional Access Parameters"
+              placeholder={
+                'Enter the JSON information to use as parameters, or select from a template'
+              }
             />
           </CCol>
         </CRow>
-        <RFFCFormRadio value="" name="AssignTo" label="Do not assign"></RFFCFormRadio>
-        <RFFCFormRadio
-          value="allLicensedUsers"
-          name="AssignTo"
-          label="Assign to all users"
-        ></RFFCFormRadio>
-        <RFFCFormRadio
-          value="AllDevices"
-          name="AssignTo"
-          label="Assign to all devices"
-        ></RFFCFormRadio>
-        <RFFCFormRadio
-          value="AllDevicesAndUsers"
-          name="AssignTo"
-          label="Assign to all users and devices"
-        ></RFFCFormRadio>
         <hr className="my-4" />
-        <WhenFieldChanges field="TemplateList" set="Description" />
-        <WhenFieldChanges field="TemplateList" set="Displayname" />
-        <WhenFieldChanges field="TemplateList" set="RAWJson" />
-        <WhenFieldChanges field="TemplateList" set="Type" />
+        <WhenFieldChanges field="TemplateList" set="rawjson" />
       </CippWizard.Page>
       <CippWizard.Page title="Review and Confirm" description="Confirm the settings to apply">
         <center>
@@ -224,40 +165,16 @@ const AddPolicy = () => {
                   <CRow>
                     <CCol md={3}></CCol>
                     <CCol md={6}>
-                      <CListGroup flush>
-                        <CListGroupItem className="d-flex justify-content-between align-items-center">
-                          Display Name: {props.values.Displayname}
-                          <FontAwesomeIcon
-                            color="#f77f00"
-                            size="lg"
-                            icon={props.values.Displayname ? faCheck : faTimes}
-                          />
-                        </CListGroupItem>
-                        <CListGroupItem className="d-flex justify-content-between align-items-center">
-                          Description: {props.values.Description}
-                          <FontAwesomeIcon
-                            color="#f77f00"
-                            size="lg"
-                            icon={props.values.Description ? faCheck : faTimes}
-                          />
-                        </CListGroupItem>
-                        <CListGroupItem className="d-flex justify-content-between align-items-center">
-                          Type: {props.values.Type}
-                          <FontAwesomeIcon
-                            color="#f77f00"
-                            size="lg"
-                            icon={props.values.Type ? faCheck : faTimes}
-                          />
-                        </CListGroupItem>
-                        <CListGroupItem className="d-flex justify-content-between align-items-center">
-                          Assign to: {props.values.AssignTo}
-                          <FontAwesomeIcon
-                            color="#f77f00"
-                            size="lg"
-                            icon={props.values.AssignTo ? faCheck : faTimes}
-                          />
-                        </CListGroupItem>
-                      </CListGroup>
+                      <h5 className="mb-0">Selected Tenants</h5>
+                      <CCallout color="info">
+                        {props.values.selectedTenants.map((tenant, idx) => (
+                          <li key={idx}>
+                            {tenant.displayName}- {tenant.defaultDomainName}
+                          </li>
+                        ))}
+                      </CCallout>
+                      <h5 className="mb-0">Rule Settings</h5>
+                      <CCallout color="info">{props.values.rawjson}</CCallout>
                     </CCol>
                   </CRow>
                 </>
